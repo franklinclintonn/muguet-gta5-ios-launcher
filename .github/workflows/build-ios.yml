@@ -1,0 +1,50 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/**"
+      - "ios/**"
+      - "launcher/**"
+      - "vendor/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "build.rs"
+      - "make-ios.sh"
+      - ".github/workflows/build-ios.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    # Apple Silicon runner with a recent Xcode toolchain
+    runs-on: macos-26
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          brew install xcodegen binaryen cmake
+          xcodebuild -version
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup target add aarch64-apple-ios --toolchain 1.98.1
+
+      - name: Build unsigned sideloadable IPA
+        env:
+          BUNDLE_ID: com.franklinclintonn.muguet
+        run: |
+          cargo fetch --locked
+          ./make-ios.sh --ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Muguet-iOS-IPA
+          path: build/Muguet.ipa
+          if-no-files-found: error
+          retention-days: 7
